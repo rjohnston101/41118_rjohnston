@@ -117,7 +117,7 @@ class DQN_Solver:
             eps_threshold = 1.0
         # if we rolled a value lower than epsilon sample a random action
         if random.random() < eps_threshold:
-            return np.random.choice(np.array(range(9)), p=[0.1,0.125,0.1,0.025,0.025,0.025,0.15,0.3,0.15])    # sample random action with set priors (if we flap too much we will die too much at the start and learning will take forever)
+            return np.random.choice(np.array(range(9)), p=[0.15, 0.2, 0.15, 0, 0, 0, 0.15, 0.2, 0.15])    # sample random action with set priors (if we flap too much we will die too much at the start and learning will take forever)
 
         # otherwise policy network, Q, chooses action with highest estimated Q-value so far
         if type(observation[0]) != float:
@@ -247,5 +247,5 @@ plt.show()
 #     #frames.append(env.render())  # if running locally not necessary unless you want to grab onboard camera image
 #     if done:
 #         break
-
+print("Simulation Ended")
 env.close()
