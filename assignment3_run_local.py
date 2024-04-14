@@ -64,10 +64,11 @@ class Network(torch.nn.Module):
 class ReplayBuffer:
     def __init__(self, env):
         self.mem_count = 0
-        self.states = np.zeros((MEM_SIZE, *env.observation_space.shape),dtype=np.float32)
+        #self.states = np.zeros((MEM_SIZE, *env.observation_space.shape),dtype=np.float32)
+        self.states = np.zeros((MEM_SIZE,2),dtype=np.float32)
         self.actions = np.zeros(MEM_SIZE, dtype=np.int64)
         self.rewards = np.zeros(MEM_SIZE, dtype=np.float32)
-        self.states_ = np.zeros((MEM_SIZE, *env.observation_space.shape),dtype=np.float32)
+        self.states_ = np.zeros((MEM_SIZE,2),dtype=np.float32)
         self.dones = np.zeros(MEM_SIZE, dtype=np.bool)
 
     def add(self, state, action, reward, state_, done):
@@ -119,10 +120,10 @@ class DQN_Solver:
             return np.random.choice(np.array(range(9)), p=[0.1,0.125,0.1,0.025,0.025,0.025,0.15,0.3,0.15])    # sample random action with set priors (if we flap too much we will die too much at the start and learning will take forever)
 
         # otherwise policy network, Q, chooses action with highest estimated Q-value so far
-        print(observation)
+        if type(observation[0]) != float:
+            observation = observation[0]
         state = torch.tensor(observation).float().detach()
         state = state.unsqueeze(0)
-        state = state[0]
         #print(state)
         self.policy_network.eval()  # only need forward pass
         with torch.no_grad():       # so we don't compute gradients - save memory and computation
@@ -205,7 +206,7 @@ for i in range(EPISODES):
 
         # only start learning once replay memory reaches REPLAY_START_SIZE
         if agent.memory.mem_count > REPLAY_START_SIZE:
-            print("hello")
+            #print("hello")
             agent.learn()
 
         state = state_
@@ -215,7 +216,7 @@ for i in range(EPISODES):
         if done:
             break
 
-    print("hello2")
+    #print("hello2")
 
     episode_history.append(i)
     episode_reward_history.append(episode_reward)
