@@ -117,7 +117,7 @@ class DQN_Solver:
             eps_threshold = 1.0
         # if we rolled a value lower than epsilon sample a random action
         if random.random() < eps_threshold:
-            return np.random.choice(np.array(range(9)), p=[0.15, 0.2, 0.15, 0, 0, 0, 0.15, 0.2, 0.15])    # sample random action with set priors (if we flap too much we will die too much at the start and learning will take forever)
+            return np.random.choice(np.array(range(9)), p=[0.15, 0.1, 0.15, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1])    # sample random action with set priors (if we flap too much we will die too much at the start and learning will take forever)
 
         # otherwise policy network, Q, chooses action with highest estimated Q-value so far
         if type(observation[0]) != float:
@@ -224,14 +224,14 @@ for i in range(EPISODES):
 
     # save our model every batches of 100 episodes so we can load later. (note: you can interrupt the training any time and load the latest saved model when testing)
     if i % 100 == 0 and agent.memory.mem_count > REPLAY_START_SIZE:
-        torch.save(agent.policy_network.state_dict(), f"policies.bak/policynetwork_e{i}.pkl")
+        #torch.save(agent.policy_network.state_dict(), f"policies.bak/policynetwork_e{i}.pkl")
         print("average total reward per episode batch since episode ", i, ": ", episode_batch_score/ float(100))
         episode_batch_score = 0
     elif agent.memory.mem_count < REPLAY_START_SIZE:
         print("waiting for buffer to fill...")
         episode_batch_score = 0
 
-torch.save(agent.policy_network.state_dict(), f"policies.bak/policynetwork_e{i}.pkl")
+#torch.save(agent.policy_network.state_dict(), f"policies.bak/policynetwork_e{i}.pkl")
 plt.plot(episode_history, episode_reward_history)
 plt.show()
 
