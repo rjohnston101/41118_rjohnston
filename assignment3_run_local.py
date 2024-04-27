@@ -1,4 +1,5 @@
 import gym
+from simple_driving.envs.simple_driving_env import SimpleDrivingEnv
 import matplotlib.pyplot as plt
 import simple_driving
 # import pybullet_envs
@@ -117,11 +118,11 @@ class DQN_Solver:
             eps_threshold = 1.0
         # if we rolled a value lower than epsilon sample a random action
         if random.random() < eps_threshold:
-            return np.random.choice(np.array(range(9)), p=[0.15, 0.1, 0.15, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1])    # sample random action with set priors (if we flap too much we will die too much at the start and learning will take forever)
+            return np.random.choice(np.array(range(9)), p=[0.05, 0.1, 0.05, 0.1, 0.1, 0.1, 0.15, 0.2, 0.15])    # sample random action with set priors (if we flap too much we will die too much at the start and learning will take forever)
 
         # otherwise policy network, Q, chooses action with highest estimated Q-value so far
-        if type(observation[0]) != float:
-            observation = observation[0]
+        #if type(observation[0]) != float:
+        #    observation = observation[0]
         state = torch.tensor(observation).float().detach()
         state = state.unsqueeze(0)
         #print(state)
@@ -179,7 +180,7 @@ class DQN_Solver:
 ##########################################################################################################################
 
 ######################### if running locally you can just render the environment in pybullet's GUI #######################
-env = gym.make("SimpleDriving-v0", apply_api_compatibility=True, renders=False, isDiscrete=True)
+env = SimpleDrivingEnv(renders=False)
 ##########################################################################################################################
 
 #######################################
@@ -199,10 +200,10 @@ for i in range(EPISODES):
         #state = state[0]
         action = agent.choose_action(state)
         #print(env.step(action))
-        state_, reward, done, _, info = env.step(action)
+        state_, reward, done, info = env.step(action)
         #print(state)
         #print(state_)
-        agent.memory.add(state[0], action, reward, state_, done)
+        agent.memory.add(state, action, reward, state_, done)
 
         # only start learning once replay memory reaches REPLAY_START_SIZE
         if agent.memory.mem_count > REPLAY_START_SIZE:
@@ -249,4 +250,28 @@ plt.show()
 #     if done:
 #         break
 print("Simulation Ended")
+env.close()
+
+
+env = SimpleDrivingEnv(renders=True)
+agent = DQN_Solver(env)  # create DQN agent
+try:
+    agent.policy_network.load_state_dict(torch.load("policy_network.pkl"))
+except:
+    print("Waiting")
+
+print("Starting testing")
+state = env.reset() 
+
+for i in range(5):
+    state = env.reset()
+    while True:
+        with torch.no_grad():
+            q_values = agent.policy_network(torch.tensor(state, dtype=torch.float32))
+        action = torch.argmax(q_values).item()
+        state, reward, done, _ = env.step(action)
+        env.render()
+        if done:
+            break
+
 env.close()
