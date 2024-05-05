@@ -21,6 +21,8 @@ from torchvision.models.detection import keypointrcnn_resnet50_fpn, KeypointRCNN
 from os.path import exists
 import torch.optim as optim
 import torch.nn as nn
+import matplotlib.pyplot as plt
+import torchvision.transforms.functional as F
 
 ########### Block 1
 # create a data loader for the dataset
@@ -97,7 +99,7 @@ device = 'cpu'
 
 folder_path = "data/outdoors_climbing_00"
 folder_path_temp = "data/outdoors_climbing_00_keypoints"
-os.mkdir(folder_path_temp)
+#os.mkdir(folder_path_temp)
 dataset_training = KeypointDataset(folder_path, folder_path_temp, sequence_length, device=device)
 if not exists("data/outdoors_climbing_00_keypoints/image_00000.pt"):
     dataset_training.preprocessData()
@@ -105,7 +107,7 @@ data_loader_training = torch.utils.data.DataLoader(dataset_training, batch_size=
 
 folder_path = "data/outdoors_climbing_01"
 folder_path_temp = "data/outdoors_climbing_01_keypoints"
-os.mkdir(folder_path_temp)
+#os.mkdir(folder_path_temp)
 dataset_testing = KeypointDataset(folder_path, folder_path_temp, sequence_length, device=device)
 if not exists("data/outdoors_climbing_01_keypoints/image_00000.pt"):
     dataset_testing.preprocessData()
@@ -117,8 +119,8 @@ class LSTM(nn.Module):
     def __init__(self, LSTM_input_size):
         super().__init__()
         # define the LSTM model
-        self.lstm = nn.LSTM(input_size=1, hidden_size=50, num_layers=1, batch_first=True)
-        self.linear = nn.Linear(50, 1)
+        self.lstm = nn.LSTM(input_size=LSTM_input_size, hidden_size=64, num_layers=2, batch_first=True)
+        self.linear = nn.Linear(64, 2)
 
 
     def forward(self, x):
@@ -140,16 +142,17 @@ training_loss = []
 testing_loss = []
 for epoch in range(epochs):
     for X_batch, y_batch in data_loader_training:
-        print(X_batch.size)
         LSTM_model.train()
+        optimizer.zero_grad()
         # Let's pick the first keypoint and its (x,y) coordinates
         # Hint: X_batch is organized as (batch_size, sequence_length, number_of_keypoints, [x,y,z])
 
         # pass through the LSTM model
-        y_pred_tr = LSTM_model(X_batch[:,0,:,:])
+        X_batch = (X_batch[:,0] * X_batch[:,1], X_batch[:,2], X_batch[:,3])
+        y_pred_tr = LSTM_model(X_batch)
 
         # loss function (remember the LSTM output and the y_batch must have the same shape)
-        loss_tr = loss_fn(y_pred_tr, y_batch[0,:])
+        loss_tr = loss_fn(y_pred_tr, y_batch)
 
         # backpropagation
         loss_tr.backward()
@@ -158,24 +161,15 @@ for epoch in range(epochs):
     # testing
     if epoch % 10 == 0:
         with torch.no_grad():
-
-            # compute the loss function for the training set
             total_loss = 0
             number_of_batches = 0
             for X_batch, y_batch in data_loader_training:
                 LSTM_model.eval()
+                X_batch = (X_batch[:,0] * X_batch[:,1], X_batch[:,2], X_batch[:,3])
+                y_pred_tr = LSTM_model(X_batch)
+                loss_tr = loss_fn(y_pred_tr, y_batch)
 
-                # Let's pick the first keypoint
-                y_pred = LSTM_model(X_train)
-
-
-                # pass through the LSTM model
-                train_RMSE = np.sqrt(loss_fn(y_pred, y_train))
-
-                # loss function
-                train_RMSE.append(train_RMSE)
-
-                total_loss += train_RMSE.item() # loss.item() returns the loss value as a float (free of the gradient)
+                total_loss += loss_tr.item() # loss.item() returns the loss value as a float (free of the gradient)
                 number_of_batches += 1
 
             training_loss.append(total_loss/number_of_batches)
@@ -185,20 +179,67 @@ for epoch in range(epochs):
             number_of_batches = 0
             for X_batch, y_batch in data_loader_testing:
                 LSTM_model.eval()
+                X_batch = (X_batch[:,0] * X_batch[:,1], X_batch[:,2], X_batch[:,3])
+                y_pred_tr = LSTM_model(X_batch)
+                loss_tr = loss_fn(y_pred_tr, y_batch)
 
-                # Let's pick the first keypoint
-                y_pred_te = LSTM_model(X_test)
-
-                # pass through the LSTM model
-                test_RMSE = np.sqrt(loss_fn(y_pred_te, y_test))
-
-                # loss function
-                test_RMSE.append(test_RMSE)
-
-                total_loss += test_RMSE.item()
+                total_loss += loss_tr.item() # loss.item() returns the loss value as a float (free of the gradient)
                 number_of_batches += 1
 
             testing_loss.append(total_loss/number_of_batches)
 
         # print the loss
         print('Epoch: ', epoch, '\tTraining loss: ', '% 6.2f' % training_loss[-1], '\tTesting loss: ', '% 6.2f' % testing_loss[-1])
+
+####### Block 5
+plt.plot(training_loss, label='Training Loss')
+plt.plot(testing_loss, label='Testing Loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.title('Training and Testing Loss')
+plt.legend()
+plt.show()
+
+####### Block 6
+def show(imgs):
+    if not isinstance(imgs, list):
+        imgs = [imgs]
+    fig, axs = plt.subplots(ncols=len(imgs), squeeze=False)
+    for i, img in enumerate(imgs):
+        img = img.detach()
+        img = F.to_pil_image(img)
+        axs[0, i].imshow(np.asarray(img))
+        axs[0, i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
+    plt.show()
+
+# plot image and keypoints
+image_index = 360
+image = dataset_testing.returnImage(image_index)
+keypoints = dataset_testing.returnKeypoints(image_index)
+
+from torchvision.utils import draw_keypoints
+res = draw_keypoints(image, keypoints[:,0:2].unsqueeze(0), colors="blue", radius=10)
+show(res)
+
+# predict the keypoints
+with torch.no_grad():
+    X_train, y_train = dataset_testing.__getitem__(image_index - (sequence_length+1))
+    train_size = int(sequence_length * split_ratio)
+    #test_size =
+    train_plot = np.ones_like(sequence_length) * np.nan
+    #test_plot =
+    y_pred = LSTM_model(X_train)
+    y_pred = y_pred[:, -1, :]
+    train_plot[4:train_size] = LSTM_model(X_train)[:, -1, :].squeeze()
+    #test_plot[train_size+4:len(timeseries)] = model(X_test)[:, -1, :].squeeze()
+
+# make sure you pick the last keypoint in the sequence
+#res_2 = draw_keypoints(image, keypoints_predicted, colors="red", radius=10)
+
+#show(res_2)
+
+plt.plot(sequence_length, label='function to optimize')
+plt.plot(train_plot, c='r', label='train prediction')
+#plt.plot(test_plot, c='g', label='test prediction')
+plt.legend()
+plt.show()
