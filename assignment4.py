@@ -120,7 +120,7 @@ class LSTM(nn.Module):
         super().__init__()
         # define the LSTM model
         self.lstm = nn.LSTM(input_size=LSTM_input_size, hidden_size=64, num_layers=2, batch_first=True)
-        self.linear = nn.Linear(64, 3)
+        self.linear = nn.Linear(64, 3) #  Account for 3D keypoints
 
 
     def forward(self, x):
@@ -146,9 +146,9 @@ for epoch in range(epochs):
         optimizer.zero_grad()
         # Let's pick the first keypoint and its (x,y) coordinates
         # Hint: X_batch is organized as (batch_size, sequence_length, number_of_keypoints, [x,y,z])
-
+        
         # pass through the LSTM model
-        X_batch = X_batch.view(-1, X_batch.size(2), X_batch.size(3))
+        X_batch = X_batch.view(-1, X_batch.size(2), X_batch.size(3)) #  reshape x_batch to suit LSTM_model
         y_pred_tr = LSTM_model(X_batch)
         y_pred_tr = y_pred_tr.view(y_batch.size(0), y_batch.size(1), y_batch.size(2), -1)
 
@@ -166,6 +166,13 @@ for epoch in range(epochs):
             number_of_batches = 0
             for X_batch, y_batch in data_loader_training:
                 LSTM_model.eval()
+
+                #train_RMSE = np.sqrt(loss_fn(y_pred, y_train))
+
+                #train_RMSE.append(train_RMSE)
+
+                #total_loss += train_RMSE.item() # loss.item() returns the loss value as a float (free of the gradient)
+
                 X_batch = X_batch.view(-1, X_batch.size(2), X_batch.size(3))
                 y_pred_tr = LSTM_model(X_batch)
                 y_pred_tr = y_pred_tr.view(y_batch.size(0), y_batch.size(1), y_batch.size(2), -1)
@@ -231,7 +238,6 @@ with torch.no_grad():
     X_train = X_train.unsqueeze(0)
     X_train = X_train.view(-1, X_train.size(2), X_train.size(3))
     #train_plot = np.ones_like(sequence_length) * np.nan
-    #test_plot =
     y_pred = LSTM_model(X_train)
     keypoints_predicted = y_pred[:, -1, :].squeeze()
     #test_plot[train_size+4:len(timeseries)] = model(X_test)[:, -1, :].squeeze()
@@ -246,3 +252,29 @@ show(res_2)
 #plt.plot(test_plot, c='g', label='test prediction')
 #plt.legend()
 #plt.show()
+
+'''
+---------Task 5---------
+##  What would happen if several person would be in the frame?
+If there were multiple people in the frame, the model will be unable to differentiate between the two and either will only develop keypoints for one person,
+or if the people were close together it may think the people are a singular person and subsequently make keypoints between the two of them.
+
+##  How would you change the algorithm to account for multiple people?
+To account for multiple people, a differential between the two would be required, with a sort of person detection system that is accurate enough to separate 
+the two people if they are close together. This would need to be implemented in the 'preprocessData' function or just prior to it, before identifying the 
+keypoints of the model.
+
+##  If the LSTM has a poor performance on the testing set, how would you explain it?
+There are a few different issues that could result in poor test set performance, including overfitting, if the model was created to be too simple, or from
+minimal training data (ie. if there are only 200 photos rather than ~1200).
+
+##  At what epochs shall we stop the training of the LSTM?
+Training should stop when the test loss converges to a singular value, and tuned so that it is not continuing for too long after it starts to converge, which
+may cause overfitting to occur.
+
+##  List all the parts of the code that needs to be changed to predict all the keypoints at once using the LSTM (and what would you change)
+To predict all the keypoints, you would have to:
+    - Make a loop of 'getItem' so that it appends all keypoints to one variable, or modify it so it extracts all the keypoints in one run.
+    - Adjust the sizing of the LSTM class so that it suits the amount of keypoints you have.
+    - Adjust the plot so that all of the keypoints are included.
+'''
