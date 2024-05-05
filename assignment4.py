@@ -120,7 +120,7 @@ class LSTM(nn.Module):
         super().__init__()
         # define the LSTM model
         self.lstm = nn.LSTM(input_size=LSTM_input_size, hidden_size=64, num_layers=2, batch_first=True)
-        self.linear = nn.Linear(64, 2)
+        self.linear = nn.Linear(64, 3)
 
 
     def forward(self, x):
@@ -129,7 +129,7 @@ class LSTM(nn.Module):
         x = self.linear(x)
         return x
 
-LSTM_input_size = 1*2 # 1 keypoints with (x,y) coordinates
+LSTM_input_size = 3 # 3D keypoints
 
 LSTM_model = LSTM(LSTM_input_size)
 optimizer = optim.Adam(LSTM_model.parameters(), lr=0.01)
@@ -148,8 +148,9 @@ for epoch in range(epochs):
         # Hint: X_batch is organized as (batch_size, sequence_length, number_of_keypoints, [x,y,z])
 
         # pass through the LSTM model
-        X_batch = (X_batch[:,0] * X_batch[:,1], X_batch[:,2], X_batch[:,3])
+        X_batch = X_batch.view(-1, X_batch.size(2), X_batch.size(3))
         y_pred_tr = LSTM_model(X_batch)
+        y_pred_tr = y_pred_tr.view(y_batch.size(0), y_batch.size(1), y_batch.size(2), -1)
 
         # loss function (remember the LSTM output and the y_batch must have the same shape)
         loss_tr = loss_fn(y_pred_tr, y_batch)
@@ -165,8 +166,9 @@ for epoch in range(epochs):
             number_of_batches = 0
             for X_batch, y_batch in data_loader_training:
                 LSTM_model.eval()
-                X_batch = (X_batch[:,0] * X_batch[:,1], X_batch[:,2], X_batch[:,3])
+                X_batch = X_batch.view(-1, X_batch.size(2), X_batch.size(3))
                 y_pred_tr = LSTM_model(X_batch)
+                y_pred_tr = y_pred_tr.view(y_batch.size(0), y_batch.size(1), y_batch.size(2), -1)
                 loss_tr = loss_fn(y_pred_tr, y_batch)
 
                 total_loss += loss_tr.item() # loss.item() returns the loss value as a float (free of the gradient)
@@ -179,8 +181,9 @@ for epoch in range(epochs):
             number_of_batches = 0
             for X_batch, y_batch in data_loader_testing:
                 LSTM_model.eval()
-                X_batch = (X_batch[:,0] * X_batch[:,1], X_batch[:,2], X_batch[:,3])
+                X_batch = X_batch.view(-1, X_batch.size(2), X_batch.size(3))
                 y_pred_tr = LSTM_model(X_batch)
+                y_pred_tr = y_pred_tr.view(y_batch.size(0), y_batch.size(1), y_batch.size(2), -1)
                 loss_tr = loss_fn(y_pred_tr, y_batch)
 
                 total_loss += loss_tr.item() # loss.item() returns the loss value as a float (free of the gradient)
@@ -225,21 +228,21 @@ show(res)
 with torch.no_grad():
     X_train, y_train = dataset_testing.__getitem__(image_index - (sequence_length+1))
     train_size = int(sequence_length * split_ratio)
-    #test_size =
-    train_plot = np.ones_like(sequence_length) * np.nan
+    X_train = X_train.unsqueeze(0)
+    X_train = X_train.view(-1, X_train.size(2), X_train.size(3))
+    #train_plot = np.ones_like(sequence_length) * np.nan
     #test_plot =
     y_pred = LSTM_model(X_train)
-    y_pred = y_pred[:, -1, :]
-    train_plot[4:train_size] = LSTM_model(X_train)[:, -1, :].squeeze()
+    keypoints_predicted = y_pred[:, -1, :].squeeze()
     #test_plot[train_size+4:len(timeseries)] = model(X_test)[:, -1, :].squeeze()
 
 # make sure you pick the last keypoint in the sequence
-#res_2 = draw_keypoints(image, keypoints_predicted, colors="red", radius=10)
+res_2 = draw_keypoints(image, keypoints_predicted.unsqueeze(0), colors="red", radius=10)
 
-#show(res_2)
+show(res_2)
 
-plt.plot(sequence_length, label='function to optimize')
-plt.plot(train_plot, c='r', label='train prediction')
+#plt.plot(sequence_length, label='function to optimize')
+#plt.plot(train_plot, c='r', label='train prediction')
 #plt.plot(test_plot, c='g', label='test prediction')
-plt.legend()
-plt.show()
+#plt.legend()
+#plt.show()
